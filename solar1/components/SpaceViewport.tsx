@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   SUN_RADIUS_KM, 
@@ -38,12 +37,10 @@ const RULER_MAJOR_TICK_KM = 1000000; // 1,000,000 km
 export const SpaceViewport: React.FC = () => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   
-  // Track loading status of the background image.  This is not displayed to the user but
-  // helps us determine when to fade in the Milky Way panorama or fall back to black.
+  // Track loading status of the background image.
   const [bgStatus, setBgStatus] = useState<'UNKNOWN' | 'LOADED' | 'ERROR'>('UNKNOWN');
 
-  // We store camera position in a ref for the animation loop to avoid React state lag,
-  // but we also sync it to state for rendering updates.
+  // Camera position state
   const cameraXRef = useRef(INITIAL_CAMERA_X_KM);
   const [cameraX, setCameraX] = useState(INITIAL_CAMERA_X_KM);
 
@@ -120,7 +117,6 @@ export const SpaceViewport: React.FC = () => {
     cameraXRef.current = targetKm;
     setCameraX(targetKm);
     
-    // Blur the button so that subsequent arrow key presses don't interact with the UI
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -137,16 +133,11 @@ export const SpaceViewport: React.FC = () => {
   };
 
   // 3. Calculate Scales & Positions
-  // Scale factor: How many Pixels represent 1 Kilometer?
   const sunDiameterKm = SUN_RADIUS_KM * 2;
-  // Prevent division by zero or negative height during init
   const safeHeight = dimensions.height || 800; 
   const pixelsPerKm = (safeHeight * SUN_VIEWPORT_RATIO) / sunDiameterKm;
 
-  // Screen Center X coordinate
   const screenCenterX = dimensions.width / 2;
-
-  // Sun Render Props
   const sunPixelRadius = SUN_RADIUS_KM * pixelsPerKm;
   const sunScreenCenterX = screenCenterX - (cameraX * pixelsPerKm);
 
@@ -158,40 +149,19 @@ export const SpaceViewport: React.FC = () => {
   return (
     <div className="relative w-full h-full bg-black isolate overflow-hidden">
       
-      {/*
-        Background and overlay
-        We no longer display a debug label or gradient.  The Milky Way image will load from the
-        public folder and fill the viewport.  In case it fails to load, the image element will
-        disappear and the black background of the container will show through.
-      */}
-
-      {/*
-        BACKGROUND LAYER
-        Load the high-quality Milky Way panorama from the public folder.  If the image cannot be
-        loaded for any reason, the <img> element will be hidden and the underlying black
-        background will remain visible.  An overlay darkens the image slightly to improve
-        contrast for on-screen text and UI elements.
-      */}
+      {/* Background Layer */}
       <div className="absolute inset-0 z-0 select-none pointer-events-none">
         <img
           src="/milkyway_bg.jpg"
           alt="Milky Way background"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bgStatus === 'LOADED' ? 'opacity-100' : 'opacity-0'}`}
           style={{ objectPosition: '50% 40%' }}
-          onLoad={() => {
-            // Mark the background as successfully loaded so that it fades in smoothly.
-            setBgStatus('LOADED');
-          }}
+          onLoad={() => setBgStatus('LOADED')}
           onError={(e) => {
-            // If the image fails to load, hide the element entirely so the black background shows.
             setBgStatus('ERROR');
             e.currentTarget.style.display = 'none';
           }}
         />
-        {/*
-          Apply a semi-transparent black overlay to the entire viewport.  This helps keep
-          planetary labels and UI elements readable on top of the detailed starfield.
-        */}
         <div className="absolute inset-0 bg-black/30" />
       </div>
 
@@ -237,9 +207,7 @@ export const SpaceViewport: React.FC = () => {
         </div>
       </div>
 
-      {/* 
-        Sun Render 
-      */}
+      {/* Sun Render */}
       <div 
         className="absolute rounded-full bg-gradient-to-r from-yellow-200 via-yellow-500 to-orange-600 shadow-[0_0_100px_rgba(255,160,0,0.6)]"
         style={{
@@ -252,39 +220,33 @@ export const SpaceViewport: React.FC = () => {
         }}
       />
 
-      {/* 
-        Asteroid Belt Render
-        Rendered as a semi-transparent band
-      */}
+      {/* Asteroid Belt Render */}
       {(() => {
         const startX = getScreenX(ASTEROID_BELT_START_KM);
         const endX = getScreenX(ASTEROID_BELT_END_KM);
         const width = endX - startX;
-        // Only render if it has positive width and is potentially visible (loose cull)
         if (width > 0) {
           return (
             <React.Fragment>
-              {/* Belt Label */}
               <div 
                 className="absolute text-white/40 text-xs uppercase tracking-widest text-center font-medium"
                 style={{
                   left: `${startX + width/2}px`,
                   top: '50%',
-                  transform: 'translate(-50%, -180px)', // Position above the band
+                  transform: 'translate(-50%, -180px)',
                   zIndex: 5,
                   textShadow: '0 1px 3px rgba(0,0,0,0.8)'
                 }}
               >
                 Asteroid Belt
               </div>
-              {/* Belt Graphic */}
               <div 
                 className="absolute bg-white/10 border-y border-white/5"
                 style={{
                   left: `${startX}px`,
                   width: `${width}px`,
                   top: '50%',
-                  height: '300px', // Arbitrary "zone" height
+                  height: '300px',
                   transform: 'translateY(-50%)',
                   zIndex: 1,
                 }}
@@ -295,17 +257,13 @@ export const SpaceViewport: React.FC = () => {
         return null;
       })()}
 
-      {/* 
-        Planets & Moons Render 
-      */}
+      {/* Planets & Moons Render */}
       {PLANETS.map((planet) => {
         const planetScreenX = getScreenX(planet.distanceFromSunKm);
-        const planetPixelRadius = Math.max(planet.radiusKm * pixelsPerKm, 1); // Minimum 1px size
+        const planetPixelRadius = Math.max(planet.radiusKm * pixelsPerKm, 1); 
         const diameter = planetPixelRadius * 2;
 
-        // Simple culling
         if (planetScreenX + diameter < -dimensions.width || planetScreenX - diameter > dimensions.width * 2) {
-           // Off screen
            return null;
         }
 
@@ -317,40 +275,28 @@ export const SpaceViewport: React.FC = () => {
               style={{
                 left: `${planetScreenX}px`,
                 top: '50%',
-                transform: `translate(-50%, calc(-50% - ${planetPixelRadius + 20}px))`, // 20px above planet
+                transform: `translate(-50%, calc(-50% - ${planetPixelRadius + 20}px))`,
                 zIndex: 30,
-                textShadow: '0 2px 4px rgba(0,0,0,0.9)' // Added shadow for stars background
+                textShadow: '0 2px 4px rgba(0,0,0,0.9)'
               }}
             >
               {planet.name}
             </div>
 
-            {/* 
-              Planet Rings (Saturn, Uranus) 
-              Improved 3D-like rendering with front/back segments
-            */}
+            {/* Planet Rings */}
             {planet.rings && (() => {
               const outerRadiusPx = planet.rings.outerRadiusKm * pixelsPerKm;
               const innerRadiusPx = planet.rings.innerRadiusKm * pixelsPerKm;
               const width = outerRadiusPx * 2;
-              
-              // Tilt ratio (0.35 creates a nice elliptical perspective)
               const tiltRatio = 0.35; 
               const height = width * tiltRatio;
-              
               const innerPercent = (innerRadiusPx / outerRadiusPx) * 100;
-              
               const ringRgba = hexToRgba(planet.rings.color, planet.rings.opacity);
-              
-              // Using radial-gradient to create the ring with a hole
-              // ellipse closest-side fits the gradient to the box shape (ellipse)
               const gradient = `radial-gradient(ellipse closest-side at center, transparent ${innerPercent}%, ${ringRgba} ${innerPercent}%, ${ringRgba} 100%, transparent 100%)`;
-
               const rotation = planet.rings.rotationDeg || 0;
 
               return (
                 <>
-                  {/* Back Ring Segment (Top half of ellipse) - Behind Planet */}
                   <div 
                     className="absolute"
                     style={{
@@ -360,12 +306,10 @@ export const SpaceViewport: React.FC = () => {
                       height: `${height}px`,
                       background: gradient,
                       transform: `translateY(-50%) rotate(${rotation}deg)`,
-                      zIndex: 15, // Behind planet (which is 20)
+                      zIndex: 15, 
                       clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)'
                     }}
                   />
-                  
-                  {/* Front Ring Segment (Bottom half of ellipse) - In front of Planet */}
                   <div 
                     className="absolute"
                     style={{
@@ -375,7 +319,7 @@ export const SpaceViewport: React.FC = () => {
                       height: `${height}px`,
                       background: gradient,
                       transform: `translateY(-50%) rotate(${rotation}deg)`,
-                      zIndex: 25, // In front of planet (which is 20)
+                      zIndex: 25, 
                       clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)'
                     }}
                   />
@@ -383,53 +327,65 @@ export const SpaceViewport: React.FC = () => {
               );
             })()}
 
-            {/* Planet Body */}
+            {/* Planet Body - UPDATED TEXTURES */}
             <div
               className="absolute rounded-full"
               style={{
-                // Determine the appropriate background for each planet.  Inner rocky planets get a subtle radial
-                // gradient, Jupiter receives custom banding to evoke its stripes, and Uranus gets a soft
-                // gradient to hint at its gaseous atmosphere.  Other planets retain a solid fill.
                 background: (() => {
-                  // Jupiter: apply layered gradients to simulate the banded atmosphere.
+                  // --- NEW: Realistic Inner Planet Textures ---
+                  
+                  // Mercury: Stark, cratered, uneven lighting (Grey/Silver)
+                  if (planet.name === 'Mercury') {
+                    return 'radial-gradient(circle at 30% 30%, #E0E0E0 0%, #9E9E9E 40%, #616161 70%, #212121 100%)';
+                  }
+
+                  // Venus: Thick, hazy, yellowish atmosphere (Cream/Gold)
+                  if (planet.name === 'Venus') {
+                    return 'radial-gradient(circle at 35% 35%, #FFF8E1 0%, #F5DEB3 40%, #D2B48C 70%, #8B4513 100%)';
+                  }
+
+                  // Earth: Deep blue ocean with atmospheric depth
+                  if (planet.name === 'Earth') {
+                    return 'radial-gradient(circle at 30% 30%, #4F97CF 0%, #2667A8 45%, #122C5E 80%, #060F24 100%)';
+                  }
+
+                  // Mars: Rusty, dusty red surface with terminator shading
+                  if (planet.name === 'Mars') {
+                    return 'radial-gradient(circle at 35% 30%, #FF8A65 0%, #D84315 45%, #8D280B 80%, #3E1105 100%)';
+                  }
+
+                  // --- Outer Planets (Refined Logic) ---
+
+                  // Jupiter: Banded atmosphere
                   if (planet.name === 'Jupiter') {
                     const base = planet.color;
                     const radial = `radial-gradient(circle at 30% 30%, ${base} 0%, ${hexToRgba(base, 0.9)} 70%, ${hexToRgba(base, 1)} 100%)`;
                     const bands = 'linear-gradient(to bottom, #D69F6E 0%, #D6A566 20%, #EED5A5 40%, #D6A566 60%, #D69F6E 80%)';
                     return `${radial}, ${bands}`;
                   }
-                  // Saturn: apply pastel banding with a radial highlight to capture its subtle stripes.
+                  // Saturn: Subtle banding
                   if (planet.name === 'Saturn') {
                     const base = planet.color;
                     const radial = `radial-gradient(circle at 30% 30%, ${base} 0%, ${hexToRgba(base, 0.9)} 70%, ${hexToRgba(base, 1)} 100%)`;
                     const bands = 'linear-gradient(to bottom, #F3D5A5 0%, #EAD6B8 25%, #F4DDB8 50%, #EAD6B8 75%, #F3D5A5 100%)';
                     return `${radial}, ${bands}`;
                   }
-
-                  // Uranus: soft radial gradient to suggest its uniform haze.
+                  // Uranus: Smooth, hazy cyan
                   if (planet.name === 'Uranus') {
                     const base = planet.color;
                     const mid = hexToRgba(base, 0.9);
                     const edge = hexToRgba(base, 1);
                     return `radial-gradient(circle at 30% 30%, ${base} 0%, ${mid} 80%, ${edge} 100%)`;
                   }
-
-                  // Neptune: deep blue radial gradient for a smoother look.
+                  // Neptune: Deep smooth blue
                   if (planet.name === 'Neptune') {
                     const base = planet.color;
                     const mid = hexToRgba(base, 0.8);
                     const edge = hexToRgba(base, 1);
                     return `radial-gradient(circle at 30% 30%, ${base} 0%, ${mid} 70%, ${edge} 100%)`;
                   }
-                  // Inner rocky planets (Mercury, Venus, Earth, Mars): apply subtle radial shading.
-                  const innerIndex = PLANETS.findIndex(p => p.name === planet.name);
-                  if (innerIndex >= 0 && innerIndex < 4) {
-                    const color = planet.color;
-                    const mid = hexToRgba(color, 0.8);
-                    const edge = hexToRgba(color, 1);
-                    return `radial-gradient(circle at 30% 30%, ${color} 0%, ${mid} 70%, ${edge} 100%)`;
-                  }
-                  // Gas giants and others: use a solid color fill.
+
+                  // Fallback for anything else
                   return planet.color;
                 })(),
                 width: `${diameter}px`,
@@ -438,15 +394,19 @@ export const SpaceViewport: React.FC = () => {
                 top: '50%',
                 transform: 'translateY(-50%)',
                 zIndex: 20,
-                boxShadow: '0 0 5px rgba(0,0,0,0.5)' // Shadow for definition against stars
+                // Added dynamic box-shadow for atmosphere glow on Earth/Venus
+                boxShadow: (() => {
+                  if (planet.name === 'Earth') return '0 0 8px rgba(79, 151, 207, 0.6)';
+                  if (planet.name === 'Venus') return '0 0 8px rgba(255, 248, 225, 0.4)';
+                  return '0 0 5px rgba(0,0,0,0.5)';
+                })()
               }}
             />
 
             {/* Moons Render */}
             {planet.moons?.map(moon => {
-               // We place moons at (PlanetX + MoonDistance) along the same axis for 1D sim
                const moonScreenX = getScreenX(planet.distanceFromSunKm + moon.distanceFromPlanetKm);
-               const moonPixelRadius = Math.max(moon.radiusKm * pixelsPerKm, 0.5); // Min 0.5px for faint visibility
+               const moonPixelRadius = Math.max(moon.radiusKm * pixelsPerKm, 0.5);
                const moonDiameter = moonPixelRadius * 2;
                
                const shouldShowLabel = ['Moon', 'Io', 'Europa', 'Ganymede', 'Callisto', 'Titan', 'Rhea'].includes(moon.name);
@@ -459,10 +419,10 @@ export const SpaceViewport: React.FC = () => {
                         style={{
                           left: `${moonScreenX}px`,
                           top: '50%',
-                          transform: `translate(-50%, calc(-50% - ${moonPixelRadius + 12}px))`, // Slightly closer than planet labels
+                          transform: `translate(-50%, calc(-50% - ${moonPixelRadius + 12}px))`,
                           zIndex: 25,
                           opacity: 0.9,
-                          textShadow: '0 1px 2px rgba(0,0,0,1)' // Added shadow for stars background
+                          textShadow: '0 1px 2px rgba(0,0,0,1)'
                         }}
                       >
                         {moon.name}
@@ -487,29 +447,20 @@ export const SpaceViewport: React.FC = () => {
         );
       })}
 
-      {/* 
-        Ruler Overlay (Minimalist Distance Scale)
-      */}
+      {/* Ruler Overlay */}
       <div className="absolute bottom-0 left-0 w-full h-16 pointer-events-none z-40 select-none overflow-hidden">
-        {/* Baseline */}
         <div className="absolute bottom-0 w-full border-b border-white/20"></div>
         
         {(() => {
-           // Don't render if invalid scale
            if (pixelsPerKm <= 0) return null;
-
-           // Calculate visible km range
            const visibleHalfWidthKm = (dimensions.width / 2) / pixelsPerKm;
            const startKm = Math.floor((cameraX - visibleHalfWidthKm) / RULER_TICK_KM) * RULER_TICK_KM;
            const endKm = Math.ceil((cameraX + visibleHalfWidthKm) / RULER_TICK_KM) * RULER_TICK_KM;
            
-           // Use index loop to avoid float accumulation errors
            const startIdx = Math.floor(startKm / RULER_TICK_KM);
            const endIdx = Math.ceil(endKm / RULER_TICK_KM);
 
            const ticks = [];
-           
-           // Prevent rendering too many ticks if zoomed abnormally (safety cap)
            if (endIdx - startIdx > 500) return null;
 
            for (let i = startIdx; i <= endIdx; i++) {
@@ -517,7 +468,6 @@ export const SpaceViewport: React.FC = () => {
               const isMajor = Math.abs(k % RULER_MAJOR_TICK_KM) < (RULER_TICK_KM / 2);
               const screenX = getScreenX(k);
               
-              // Cull off-screen ticks slightly loosely
               if (screenX < -50 || screenX > dimensions.width + 50) continue;
 
               ticks.push(
@@ -533,7 +483,6 @@ export const SpaceViewport: React.FC = () => {
                 >
                   {isMajor && (
                      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 text-[10px] text-white/70 font-mono whitespace-nowrap drop-shadow-md">
-                       {/* Format: 1M, 2M, etc. */}
                        {(k / 1000000).toLocaleString()}M
                      </div>
                   )}
@@ -544,7 +493,7 @@ export const SpaceViewport: React.FC = () => {
         })()}
       </div>
 
-      {/* Debug Readout - Bottom Left */}
+      {/* Debug Readout */}
       <div className="absolute bottom-4 left-4 font-mono text-green-400 bg-black/80 p-4 rounded border border-green-900/50 pointer-events-none select-none z-50 backdrop-blur-sm">
         <div className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Distance from Sun</div>
         <div className="text-lg">{Math.floor(cameraX).toLocaleString()} km</div>
@@ -552,7 +501,7 @@ export const SpaceViewport: React.FC = () => {
         {isAutoTravel && <div className="text-xs text-yellow-400 mt-2 animate-pulse">AUTO-PILOT ACTIVE (1c)</div>}
       </div>
 
-      {/* Light-bulb Toggle Button - Bottom Right */}
+      {/* Toggle Button */}
       <button
         onClick={toggleAutoTravel}
         className={`absolute bottom-4 right-4 p-3 rounded-full transition-all duration-300 border z-50 outline-none focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
